@@ -1,0 +1,19 @@
+cookie:
+  expiry_days: 30
+  key: random_signature_key
+  name: random_cookie_name
+credentials:
+  usernames:
+    admin:
+      email: admin@gmail.com
+      logged_in: false
+      name: Admin (Do Not Delete)
+      password: $2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW
+    beboo:
+      email: ahmed.mohamedem797979@gmail.com
+      first_name: Ahmed
+      last_name: Mohamed
+      logged_in: false
+      password: $2b$12$kUpg1QXAedhTEwSv1BDjZeqmQknL8s2buW3fweHhiH07cgVhTroYq
+      password_hint: asm
+      roles: null
