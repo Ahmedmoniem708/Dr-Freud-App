@@ -27,19 +27,20 @@ import pandas as pd
 BETA_MODE = False   
 TRIAL_DAYS = 15     
 
-# 🔐 قراءة المفتاح من ملف الأسرار (الأمان)
-# إذا لم يجد الملف (في حالة التجربة السريعة)، سيستخدم المفتاح الاحتياطي
-try:
+# 🔐 قراءة المفتاح من الأسرار (هنا تم التنظيف الكامل للأمان)
+if "GROQ_API_KEY" in st.secrets:
     API_KEY = st.secrets["GROQ_API_KEY"]
-except:
-    # مفتاح احتياطي (يعمل مؤقتاً، يفضل الاعتماد على secrets.toml)
-    API_KEY = "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"
+else:
+    st.error("⚠️ مفتاح GROQ_API_KEY غير موجود!")
+    st.info("للعمل محلياً: أضف المفتاح في ملف .streamlit/secrets.toml")
+    st.info("عند النشر: أضف المفتاح في إعدادات (Secrets) على Streamlit Cloud.")
+    st.stop()
 # ==========================================
 
 st.set_page_config(page_title="SYSTEM: FREUD", page_icon="👁️", layout="wide")
 
 # ---------------------------------------------------------
-# 🎨 CSS: تصميم "ميدتيرم" (Dark Sci-Fi + WhatsApp Layout)
+# 🎨 CSS: تصميم "ميدتيرم" (Dark Sci-Fi & WhatsApp Layout)
 # ---------------------------------------------------------
 st.markdown("""
 <style>
@@ -210,10 +211,10 @@ def get_user_profile(username):
         "display_name": username,
         "age": "",
         "location": "القاهرة",
-        "profession": "",  # 🔥 الوظيفة
-        "bio": "", # نبذة
+        "profession": "", 
+        "bio": "", 
         "interests": "",
-        "psycho_type": "مجهول", # النمط النفسي
+        "psycho_type": "مجهول", 
         "defense_mechanism": "SCANNING...",
         "core_trauma": "HIDDEN",
         "mood_history": [],
@@ -263,7 +264,6 @@ def transcribe_audio(audio_bytes, lang_code):
 
 async def generate_speech(text, lang_code):
     voice = "ar-EG-SalmaNeural" if lang_code == "ar" else "en-US-JennyNeural"
-    # تبطيء وتعميق الصوت (Sci-Fi Voice)
     communicate = edge_tts.Communicate(text, voice, rate="-15%", pitch="-5Hz")
     await communicate.save("reply.mp3")
 
@@ -333,11 +333,10 @@ if st.session_state.get("authentication_status"):
     profile, days_passed = get_user_profile(username)
     locked = False if (BETA_MODE or profile["plan"] == "premium" or (TRIAL_DAYS - days_passed) > 0) else True
 
-    # --- تجهيز الـ AI ---
     llm = ChatGroq(groq_api_key=API_KEY, model_name="llama-3.3-70b-versatile", temperature=0.7)
 
     # ==========================
-    # 📌 SIDEBAR: الملف السري
+    # 📌 SIDEBAR
     # ==========================
     with st.sidebar:
         st.markdown(f"""
@@ -347,7 +346,6 @@ if st.session_state.get("authentication_status"):
         </div>
         """, unsafe_allow_html=True)
         
-        # عرض الوظيفة والنمط
         user_prof = profile.get('profession', 'UNKNOWN')
         user_bio = profile.get('bio', '')
         
@@ -371,28 +369,23 @@ if st.session_state.get("authentication_status"):
         </div>
         """, unsafe_allow_html=True)
         
-        # 🔥 زر مسح الشات الذكي
         if st.button("🧹 PURGE CHAT (SAVE MEMORY)", use_container_width=True):
             if st.session_state.get("messages", []):
-                with st.spinner("ARCHIVING MEMORIES TO BLACK BOX..."):
+                with st.spinner("ARCHIVING MEMORIES..."):
                     try:
                         chat_txt = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages if m['role']!='system'])
-                        sum_prompt = f"Summarize user's key psychological traits/problems from this chat for future ref:\n{chat_txt}"
+                        sum_prompt = f"Summarize key psychological traits/problems from this chat:\n{chat_txt}"
                         summary = llm.invoke(sum_prompt).content
-                        
                         old_mem = profile.get("memory_summary", "")
-                        new_mem = f"{old_mem}\n\n[SESSION {datetime.now().date()}]: {summary}"[-5000:]
-                        profile["memory_summary"] = new_mem
+                        profile["memory_summary"] = f"{old_mem}\n\n[SESSION]: {summary}"[-5000:]
                         update_profile(username, profile)
-                        
                         st.session_state.messages = []
                         save_history(username, [])
-                        st.toast("MEMORY STORED. CHAT PURGED.", icon="💾")
+                        st.toast("MEMORY STORED.")
                         time.sleep(1)
                         st.rerun()
                     except: st.error("MEMORY ERROR")
-            else:
-                st.warning("NO DATA TO PURGE.")
+            else: st.warning("NO DATA.")
 
         authenticator.logout(location='sidebar')
 
@@ -404,25 +397,21 @@ if st.session_state.get("authentication_status"):
     ])
 
     # --------------------------
-    # TAB 1: الشات (The Core)
+    # TAB 1: الشات
     # --------------------------
     with tab_chat:
-        mode = st.radio("PROTOCOL", ["PRIVATE", "THE CIRCLE (Group)"], horizontal=True, label_visibility="collapsed")
+        mode = st.radio("PROTOCOL", ["PRIVATE", "THE CIRCLE"], horizontal=True, label_visibility="collapsed")
         
-        if mode == "THE CIRCLE (Group)":
-            st.warning("⚠️ GROUP MODE ACTIVE. SECRETS ARE SHARED.")
+        if mode == "THE CIRCLE":
+            st.warning("⚠️ GROUP MODE ACTIVE.")
             if "group_members" not in st.session_state: st.session_state.group_members = []
-            
-            if st.button("🧬 AI MATCHMAKING (FIND 5)", use_container_width=True):
-                with st.spinner("SCANNING NEURAL NETWORK..."):
-                    # محاكاة سريعة
+            if st.button("🧬 AI MATCHMAKING", use_container_width=True):
+                with st.spinner("SCANNING..."):
                     st.session_state.group_members = ["Shadow_Walker", "Lost_Soul_99", "Cairo_Ghost", "Nile_Siren", "Dark_Poet"]
                     st.rerun()
-            
             if st.session_state.group_members:
                 st.code(f"CONNECTED: {', '.join(st.session_state.group_members)}")
 
-        # عرض الرسائل
         if "messages" not in st.session_state: st.session_state.messages = load_history(username)
         
         chat_container = st.container()
@@ -432,7 +421,6 @@ if st.session_state.get("authentication_status"):
                 with st.chat_message(msg["role"], avatar="🧠" if msg["role"] == "assistant" else "👤"):
                     st.write(msg["content"])
 
-        # المدخلات
         final_input = None
         if not locked:
             st.markdown('<div class="whatsapp-mic-container">', unsafe_allow_html=True)
@@ -440,7 +428,6 @@ if st.session_state.get("authentication_status"):
             with c_mic:
                 audio = mic_recorder(start_prompt="👁️", stop_prompt="⛔", key='mic_input')
             st.markdown('</div>', unsafe_allow_html=True)
-            
             if audio:
                 with st.spinner("DECODING..."):
                     transcribed = transcribe_audio(audio['bytes'], "ar")
@@ -450,49 +437,33 @@ if st.session_state.get("authentication_status"):
         text_input = st.chat_input("ENTER DATA...")
         if text_input: final_input = text_input
 
-        # المعالجة
         if final_input:
             user_msg = f"[SECRET_VAULT] {final_input}" if vault_mode else final_input
-            if mode == "THE CIRCLE (Group)" and not vault_mode: user_msg = f"[{name}]: {final_input}"
-
+            if mode == "THE CIRCLE" and not vault_mode: user_msg = f"[{name}]: {final_input}"
             st.session_state.messages.append({"role": "user", "content": user_msg})
             if not vault_mode:
                 with st.chat_message("user", avatar="👤"): st.write(user_msg)
 
             with st.chat_message("assistant", avatar="🧠"):
                 msg_ph = st.empty()
-                
-                # تحليل في الخلفية
                 if len(final_input.split()) > 3:
                     try:
-                        analysis_p = f"Analyze psychological state in 2 words (Mechanism, Trauma) comma separated: '{final_input}'"
+                        analysis_p = f"Analyze psychological state in 2 words (Mechanism, Trauma): '{final_input}'"
                         res = llm.invoke(analysis_p).content
                         if "," in res:
                             mech, trauma = res.split(",", 1)
-                            profile["defense_mechanism"] = mech.strip()
-                            profile["core_trauma"] = trauma.strip()
+                            profile["defense_mechanism"], profile["core_trauma"] = mech.strip(), trauma.strip()
                             update_profile(username, profile)
                     except: pass
 
-                # استرجاع الذاكرة طويلة المدى
-                long_term_memory = profile.get("memory_summary", "")
-
-                # البرومبت الدرامي
                 sys_prompt = f"""
                 SYSTEM: Dr. Freud (The Black Box).
                 SUBJECT: {name}, Job: {profile.get('profession')}.
-                BIO: {profile.get('bio')}.
-                
-                ⚡ LONG TERM MEMORY:
-                {long_term_memory}
-                
+                LONG TERM MEMORY: {profile.get('memory_summary')}
                 INPUT: "{final_input}"
-                PROTOCOL: Deep Psychoanalysis.
-                STYLE: Dark, Mysterious, Clinical but knowing.
-                Use the user's profession ({profile.get('profession')}) as a metaphor if possible.
+                STYLE: Dark, Mysterious.
                 Reply in Arabic.
                 """
-                
                 try:
                     response_text = llm.invoke(sys_prompt).content
                     msg_ph.write_stream(stream_data(response_text))
@@ -505,41 +476,31 @@ if st.session_state.get("authentication_status"):
     # TAB 2: المرآة
     # --------------------------
     with tab_mirror:
-        st.header("🪞 REFLECTION TEST")
+        st.header("🪞 REFLECTION")
         with st.form("mirror"):
             q1 = st.text_input("1. What do you see in the dark?")
-            q2 = st.text_input("2. What is your deepest regret?")
             if st.form_submit_button("ANALYZE"):
-                with st.spinner("SCANNING..."):
-                    res = llm.invoke(f"Analyze psychology based on: {q1}, {q2}. Give creative 'Psycho-Type' title.").content
-                    st.markdown(res)
-                    try: 
-                        ptype = res.split("\n")[0]
-                        profile['psycho_type'] = ptype
-                        update_profile(username, profile)
-                    except: pass
+                res = llm.invoke(f"Analyze psychology based on: {q1}").content
+                st.markdown(res)
+                profile['psycho_type'] = res.split("\n")[0]
+                update_profile(username, profile)
 
     # --------------------------
     # TAB 3: الشبكة
     # --------------------------
     with tab_network:
-        st.header("🌐 NEURAL MATCHING")
-        my_type = profile.get("psycho_type", "Unknown")
-        st.info(f"MATCHING FOR TYPE: {my_type}")
-        if st.button("SCAN NETWORK"):
-            with st.spinner("SEARCHING..."):
-                cols = st.columns(3)
-                fake_users = ["Ghost_User_1", "Echo_22", "Void_Walker"]
-                for i, u in enumerate(fake_users):
-                    with cols[i]:
-                        st.markdown(f"<div class='match-card'><h3>{u}</h3><p style='color:#00ff41'>9{i}% MATCH</p></div>", unsafe_allow_html=True)
+        st.header("🌐 NETWORK")
+        if st.button("SCAN"):
+            cols = st.columns(3)
+            for i, u in enumerate(["User_X", "Echo_1", "Void"]):
+                with cols[i]: st.markdown(f"<div class='match-card'><h3>{u}</h3><p>MATCH</p></div>", unsafe_allow_html=True)
 
     # --------------------------
-    # TAB 4: البيانات (التعديل)
+    # TAB 4: البيانات
     # --------------------------
     with tab_data:
-        st.header("📊 SUBJECT DATA")
-        with st.expander("UPDATE PROFILE"):
+        st.header("📊 DATA")
+        with st.expander("UPDATE"):
             c1, c2 = st.columns(2)
             with c1:
                 n_age = st.text_input("AGE", profile.get("age"))
@@ -547,14 +508,11 @@ if st.session_state.get("authentication_status"):
             with c2:
                 n_prof = st.text_input("PROFESSION", profile.get("profession"))
                 n_int = st.text_input("INTERESTS", profile.get("interests"))
-            
-            n_bio = st.text_area("BIO / نبذة", profile.get("bio"))
-            
-            if st.button("SAVE CHANGES"):
+            n_bio = st.text_area("BIO", profile.get("bio"))
+            if st.button("SAVE"):
                 profile.update({"age": n_age, "location": n_loc, "profession": n_prof, "interests": n_int, "bio": n_bio})
                 update_profile(username, profile)
-                st.success("DATA UPDATED.")
-                time.sleep(1)
+                st.success("UPDATED.")
                 st.rerun()
 
 elif st.session_state.get("authentication_status") is False:
